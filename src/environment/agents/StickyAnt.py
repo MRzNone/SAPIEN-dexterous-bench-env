@@ -18,6 +18,7 @@ class StickyAnt(AgentBase):
         self.robot: sapien.Articulation = ant_builder.build()
         self.robot.set_pose(pose)
 
+        # adjust damping
         if damping is not None:
             if isinstance(damping, int):
                 damping = np.array([damping] * self.robot.dof)
@@ -27,15 +28,27 @@ class StickyAnt(AgentBase):
             for joint, d in zip(self.robot.get_joints(), damping):
                 joint.set_drive_property(stiffness=0, damping=d)
 
-        self.env_man.register_agent(self)
+        self.mId = self.env_man.register_agent(self)
+        self.robot.set_name(f"Sticky_ant_{self.mId}")
 
+        # get foot for sticky
         self.num_foot = 4
-
         self.foot = self.robot.get_links()[-self.num_foot:]
         self.sticks: [sapien.Drive] = [None] * self.num_foot
         self.touch_radius = 0.15
 
-        print("Sticky Ant created")
+        self.camera = self.mount_camera()
+
+        print(f"{self.mId}: Sticky Ant created")
+
+    def mount_camera(self) -> sapien.ICamera:
+        body = self.robot.get_links()[0]
+        near, far = 0.05, 100
+        camera = self.env_man.scene.add_mounted_camera(f"ant_{self.mId}_cam", body, Pose([0, 0, 3], [0, -0.7071068, 0, 0.7071068]),
+                                                       1920, 1080, np.deg2rad(50), np.deg2rad(50),
+                                                       near, far)
+
+        return camera
 
     def get_observation(self) -> np.ndarray:
         """
@@ -85,7 +98,7 @@ class StickyAnt(AgentBase):
         pose2 = other_actor.get_pose().inv() * Pose(pt)
 
         drive = self.env_man.scene.create_drive(feet, pose1, other_actor, pose2)
-        drive.set_properties(1e38, 1e38)
+        drive.set_properties(1000, 0, is_acceleration=False)
 
         self.sticks[foot_index] = drive
         print(f"foot {foot_index+1} sticks")

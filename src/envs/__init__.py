@@ -1,1 +1,1 @@
-from . import DragStone
+from . import DragTable
