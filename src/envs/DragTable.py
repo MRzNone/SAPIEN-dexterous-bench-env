@@ -23,7 +23,7 @@ class DragTable:
         self.env_man = EnvManager(self.sim, time_step, cam_pos=cam_pos, cam_rot=cam_rot)
 
         # create table
-        self.table = self.env_man.get_point_net_urdf(24152, 1.8)
+        self.table = self.env_man.get_point_net_urdf(21473, 1.8)
 
         # create ants
         self.ants = []
