@@ -39,7 +39,7 @@ class StickyAnt(AgentBase):
 
         self.camera = self.mount_camera()
 
-        print(f"{self.mId}: Sticky Ant created")
+        print(f"Created: Sticky Ant {self.mId} created")
 
     def mount_camera(self) -> sapien.ICamera:
         body = self.robot.get_links()[0]

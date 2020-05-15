@@ -12,6 +12,7 @@ ASSET_DIR = os.path.abspath("../../Assets")
 class EnvManager:
     def __init__(self, sim: sapien.Engine, timestep: float, visual: bool = True,
                  cam_pos=None, cam_rot=None, ground=True, *args):
+        self.call_backs = []
         if cam_rot is None:
             cam_rot = [0, 0]
         if cam_pos is None:
@@ -68,9 +69,14 @@ class EnvManager:
     def show_window(self):
         self.render_controller.show_window()
 
+    def add_callback(self, method):
+        self.call_backs.append(method)
+
     def step(self, visual=True):
         self.scene.step()
-
         if visual:
             self.scene.update_render()
             self.render_controller.render()
+
+        for cb in self.call_backs:
+            cb()
