@@ -40,7 +40,18 @@ class PandaArm(AgentBase):
 
         self.mount_camera()
 
+        self.ini_pack = self.robot.pack()
+
         print(f"Created: PandaArm {self.mId} created")
+
+    def save(self):
+        return self.robot.pack()
+
+    def load(self, data):
+        self.robot.unpack(data)
+
+    def reset(self):
+        self.load(self.ini_pack)
 
     def mount_camera(self):
         pass

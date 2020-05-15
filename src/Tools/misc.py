@@ -31,7 +31,7 @@ ant_poses = {
 }
 
 
-def create_ant_builder(scene: sapien.Scene, sim:sapien.Engine, rgba=None) -> sapien.pysapien.ArticulationBuilder:
+def create_ant_builder(scene: sapien.Scene, sim: sapien.Engine, rgba=None) -> sapien.pysapien.ArticulationBuilder:
     if rgba is None:
         rgba = [0.875, 0.553, 0.221, 1]
     copper = sapien.PxrMaterial()
@@ -50,9 +50,11 @@ def create_ant_builder(scene: sapien.Scene, sim:sapien.Engine, rgba=None) -> sap
     body.add_capsule_visual_complex(Pose([0.141, 0, 0]), 0.08, 0.141, copper)
     body.add_capsule_shape(Pose([-0.141, 0, 0]), 0.08, 0.141, material=ant_material, density=density)
     body.add_capsule_visual_complex(Pose([-0.141, 0, 0]), 0.08, 0.141, copper)
-    body.add_capsule_shape(Pose([0, 0.141, 0], aa([0, 0, 1], np.pi / 2)), 0.08, 0.141, material=ant_material, density=density)
+    body.add_capsule_shape(Pose([0, 0.141, 0], aa([0, 0, 1], np.pi / 2)), 0.08, 0.141, material=ant_material,
+                           density=density)
     body.add_capsule_visual_complex(Pose([0, 0.141, 0], aa([0, 0, 1], np.pi / 2)), 0.08, 0.141, copper)
-    body.add_capsule_shape(Pose([0, -0.141, 0], aa([0, 0, 1], np.pi / 2)), 0.08, 0.141, material=ant_material, density=density)
+    body.add_capsule_shape(Pose([0, -0.141, 0], aa([0, 0, 1], np.pi / 2)), 0.08, 0.141, material=ant_material,
+                           density=density)
     body.add_capsule_visual_complex(Pose([0, -0.141, 0], aa([0, 0, 1], np.pi / 2)), 0.08, 0.141, copper)
     body.set_name("body")
 
@@ -121,3 +123,19 @@ def create_ant_builder(scene: sapien.Scene, sim:sapien.Engine, rgba=None) -> sap
     f4.add_capsule_visual_complex(Pose(), 0.08, 0.282, copper)
 
     return builder
+
+
+def save_actor(actor: sapien.Actor):
+    p = actor.get_pose()
+    v = actor.get_velocity()
+    l = actor.get_angular_velocity()
+
+    return [p, v, l]
+
+
+def load_actor(actor: sapien.Actor, data: []):
+    p, v, l = data
+
+    actor.set_pose(p)
+    actor.set_velocity(v)
+    actor.set_angular_velocity(l)

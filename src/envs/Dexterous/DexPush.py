@@ -1,15 +1,18 @@
 import sapien.core as sapien
 from sapien.core import Pose
 import numpy as np
-
-from environment import EnvManager
-from environment.agents import PandaArm
 from transforms3d.quaternions import quat2mat
 
+from Tools import misc
+from environment import EnvManager
+from environment.agents import PandaArm
 
-class DexPush:
+from envs import EnvBase
+
+
+class DexPush(EnvBase):
     def __init__(self, cam_pos=None, cam_rot=None,
-                 time_step: float = 1 / 100):
+                 time_step: float = 1 / 300):
         if cam_rot is None:
             cam_rot = [np.pi, -0.7]
         if cam_pos is None:
@@ -25,13 +28,34 @@ class DexPush:
 
         # place box
         self.box = self.build_box()
-        self.box.set_pose(Pose([0.5, -0.3, -0.9]))
+        self.box.set_pose(Pose([0.5, -0.3, -0.99]))
 
         # create goal
         self.goal = self.build_goal()
         self.goal.set_pose(Pose(self.GOAl_POS))
 
         self.env_man.add_callback(self.check_not_flip)
+
+        self.ini_pack = self.save()
+
+    def reset(self) -> []:
+        self.load(self.ini_pack)
+        self.box_flipped = False
+
+        return self.step()
+
+    def save(self) -> []:
+        box_data = misc.save_actor(self.box)
+        arm_data = self.arm.save()
+
+        return [box_data, arm_data]
+
+    def load(self, data: []) -> None:
+        box_data = data[0]
+        arm_data = data[1]
+
+        misc.load_actor(self.box, box_data)
+        self.arm.load(arm_data)
 
     def check_not_flip(self):
         if self.box_flipped is True:
@@ -50,15 +74,15 @@ class DexPush:
 
     def reward(self):
         if self.box_flipped:
-            return 0
+            return np.array([0])
 
         box_pos = self.box.get_pose().p
         dist = np.linalg.norm(self.GOAl_POS[:2] - box_pos[:2])
 
         if dist < 5e-3:
-            return 1
+            return np.array([1])
 
-        return 0
+        return np.array([0])
 
     def build_box(self):
         box_size = [0.02] * 3
@@ -77,8 +101,18 @@ class DexPush:
     def show_window(self):
         self.env_man.show_window()
 
+    def get_obs(self):
+        box_obs = [self.box.get_pose().p.tolist(), self.box.get_pose().q.tolist()]
+        arm_obs = self.arm.get_observation().tolist()
+        return [arm_obs, box_obs]
+
     def step(self):
         self.env_man.step()
+
+        return self.get_obs()
+
+    def get_metadata(self) -> dict:
+        None
 
     def should_quit(self):
         return self.env_man.render_controller.should_quit
