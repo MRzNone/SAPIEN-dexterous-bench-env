@@ -31,7 +31,9 @@ class EnvManager:
             self.render_controller.set_camera_position(*cam_pos)
             self.render_controller.set_camera_rotation(*cam_rot)
 
-        self.scene = self.sim.create_scene(*args)
+        sceneConfig = sapien.SceneConfig()
+        sceneConfig.sleep_threshold = 0.00005
+        self.scene = self.sim.create_scene(config=sceneConfig)
         if ground:
             self.scene.add_ground(-1)
         self.scene.set_timestep(timestep)

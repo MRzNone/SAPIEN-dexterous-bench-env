@@ -28,7 +28,7 @@ class DexPush(EnvBase):
 
         # place box
         self.box = self.build_box()
-        self.box.set_pose(Pose([0.5, -0.3, -0.99]))
+        self.box.set_pose(self.random_pose())
 
         # create goal
         self.goal = self.build_goal()
@@ -37,6 +37,17 @@ class DexPush(EnvBase):
         self.env_man.add_callback(self.check_not_flip)
 
         self.ini_pack = self.save()
+
+    def random_pose(self, theta_range=[0, 2 * np.pi], len=[0.2, 0.6]):
+        theta = np.random.uniform(low=theta_range[0], high=theta_range[1])
+        r = np.random.uniform(low=len[0], high=len[1])
+
+        print(theta / np.pi * 180, r)
+
+        x = r * np.cos(theta)
+        y = r * np.sin(theta)
+
+        return Pose([x, y, -0.99])
 
     def reset(self) -> []:
         self.load(self.ini_pack)
