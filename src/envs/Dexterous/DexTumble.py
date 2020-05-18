@@ -75,6 +75,11 @@ class DexTumble(EnvBase):
         tilted = rot_mat[:3, 2]
         tilted /= np.linalg.norm(tilted)
 
+        if box_pose.p[2] > -1 + self.BOX_SIZE * 1.5:
+            print("Failed to tumble")
+            self.box_tumble_transform = False
+            return
+
         theta_x = np.arccos(tilted[0])
         theta_y = np.arccos(tilted[1])
 
