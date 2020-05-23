@@ -99,6 +99,7 @@ class DexEnv(Env):
 
     def add_task(self, t: Task):
         self._tasks.append(t)
+        t.init(self)
 
     @property
     def agents(self) -> Dict[str, Agent]:

@@ -1,2 +1,2 @@
-from .PandaArm import *
-from .Box import *
+from .pandaArm import *
+from .box import *

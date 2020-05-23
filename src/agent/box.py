@@ -34,6 +34,10 @@ class Box(Agent):
         self._box.set_pose(self._ini_pose)
 
     @property
+    def box_size(self) -> float:
+        return self._size[0]
+
+    @property
     def action_spec(self) -> dict:
         return None
 
@@ -43,7 +47,9 @@ class Box(Agent):
 
     @property
     def observation(self) -> dict:
-        return None
+        return {
+            "pose": self._box.get_pose()
+        }
 
     def set_action(self, action):
         return None
