@@ -13,6 +13,9 @@ TILT_THRESHHOLD = np.pi / 180 * 20
 BOX_AT_GOAL_THRESHOLD = 5e-3
 BOX_HEIGHT_THRESHOLD = 2e-2
 
+FAIL_REASON_TILT = "box was tilted"
+FAIL_REASON_LIFTED = "box was lifted off-ground"
+
 
 def build_goal(scene, side_len) -> sapien.Actor:
     size = [side_len, side_len, 0.001]
@@ -32,6 +35,7 @@ class DexPushTask(Task):
         self._goal: sapien.Actor = None
         self._box_height_thresh = None
         self._tracking = True
+        self._failed_reason = None
 
         self._initialized = False
         self._parameters = None
@@ -58,6 +62,7 @@ class DexPushTask(Task):
         self._box_valid_push = True
         self._suceeded = False
         self._tracking = True
+        self._failed_reason = None
 
         self._parameters = {
             "box_size": self._box.box_size,
@@ -86,7 +91,7 @@ class DexPushTask(Task):
     def after_substep(self, env) -> None:
         assert self._initialized, "task not initialized"
 
-        if self._box_valid_push is False or self._suceeded is True:
+        if self._box_valid_push is False or self._suceeded is True or not self._tracking:
             self._tracking = False
             return
 
@@ -98,8 +103,15 @@ class DexPushTask(Task):
 
         theta = np.arccos(tilted @ up_right_pose)
 
-        if theta > TILT_THRESHHOLD or box_pose.p[2] > self._box_height_thresh:
+        if theta > TILT_THRESHHOLD:
             self._box_valid_push = False
+            self._failed_reason = FAIL_REASON_TILT
+            return
+        elif box_pose.p[2] > self._box_height_thresh:
+            self._box_valid_push = False
+            self._failed_reason = FAIL_REASON_LIFTED
+            return
+
 
         # check if succeeded
         dist = np.linalg.norm(GOAl_POS[:2] - box_pose.p[:2])
@@ -113,11 +125,16 @@ class DexPushTask(Task):
     def get_trajectory_status(self) -> dict:
         assert self._initialized, "task not initialized"
 
-        return {
-                "success": self._suceeded,
+        status = {
+                "succeeded": self._suceeded,
                 "valid_push": self._box_valid_push,
                 "tracking": self._tracking
             }
+
+        if not self._suceeded and not self._tracking:
+            status['failed_reason'] = self._failed_reason
+
+        return status
 
 
 if __name__ == '__main__':
@@ -129,9 +146,4 @@ if __name__ == '__main__':
 
     while not env.should_quit:
         env.step()
-
-        i += 1
-
-        if i > 500:
-            i = 0
-            task.reset(env)
+        print(task.get_trajectory_status())
