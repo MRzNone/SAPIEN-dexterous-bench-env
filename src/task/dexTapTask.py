@@ -7,15 +7,12 @@ from agent import Box, PandaArm
 from env.dexEnv import BOX_NAME, DexEnv, ARM_NAME
 from sapien_interfaces import Task, Env
 
-TASK_NAME = "Dexterous Box Push"
-GOAl_POS = np.array([0.5, 0.3, -1])
-TILT_THRESHHOLD = np.pi / 180 * 20
-BOX_AT_GOAL_THRESHOLD = 5e-3
-BOX_HEIGHT_THRESHOLD = 2e-2
+TASK_NAME = "Dexterous Box Tap"
+MAX_TAP_SEC = 1
 
-FAIL_REASON_TILT = "box was tilted"
-FAIL_REASON_LIFTED = "box was lifted off-ground"
-FAIL_REASON_TOUCHED_UP = "touched box at top"
+FAIL_REASON_TOUCHED_TOO_LONG = "contact too long"
+FAIL_REASON_MULTI_CONTACT = "box was touched at multiple locations"
+FAIL_REASON_CONTACT_MOVED = "contact point moved too much during contact"
 
 
 def build_goal(scene, side_len) -> sapien.Actor:
@@ -25,18 +22,19 @@ def build_goal(scene, side_len) -> sapien.Actor:
     return builder.build(True, "Goal")
 
 
-class DexPushTask(Task):
+class DexTapTask(Task):
 
     def __init__(self):
-        self._box_valid_push = True
         self._suceeded = False
 
         self._box: Box = None
         self._arm: PandaArm = None
-        self._goal: sapien.Actor = None
-        self._box_height_thresh = None
         self._tracking = True
+
+        self._last_contact = None
+        self._contact_start_step = None
         self._failed_reason = None
+        self._max_tap_steps = None
 
         self._initialized = False
         self._parameters = None
@@ -50,27 +48,21 @@ class DexPushTask(Task):
         self._box = env.agents[BOX_NAME]
         assert self._box is not None and isinstance(self._box, Box), \
             f"{BOX_NAME} does not exist in env"
-        self._box_height_thresh = self._box.observation['pose'].p[2] + BOX_HEIGHT_THRESHOLD
 
         # add arm
         self._arm = env.agents[ARM_NAME]
         assert self._arm is not None and isinstance(self._arm, PandaArm), \
             f"{ARM_NAME} does not exist in env"
 
-        # build goal
-        self._goal = build_goal(env.scene, self._box.box_size)
-        self._goal.set_pose(Pose(GOAl_POS))
-        self._box_valid_push = True
         self._suceeded = False
         self._tracking = True
         self._failed_reason = None
+        self._last_contact = None
+        self._contact_start_step = None
+        self._max_tap_steps = MAX_TAP_SEC / env.timestep
 
         self._parameters = {
             "box_size": self._box.box_size,
-            "box_tilt_threshold_rad": TILT_THRESHHOLD,
-            "box_at_goal_threshold_meter": BOX_AT_GOAL_THRESHOLD,
-            "box_height_threshold_global": self._box_height_thresh,
-            "goal_pos": GOAl_POS,
         }
 
         self._initialized = True
@@ -92,49 +84,63 @@ class DexPushTask(Task):
     def after_substep(self, env) -> None:
         assert self._initialized, "task not initialized"
 
-        if self._box_valid_push is False or self._suceeded is True or not self._tracking:
+        if self._suceeded is True or self._failed_reason is not None or not self._tracking:
             self._tracking = False
             return
 
-        box_pose = self._box.observation['pose']
-        # calcilate how much "flipped"
-        up_right_pose = np.array([0, 0, 1])
-        rot_mat = quat2mat(box_pose.q)
-        box_up = rot_mat[:, 2]
-        box_up /= np.linalg.norm(box_up)
-
-        theta = np.arccos(box_up @ up_right_pose)
-
-        if theta > TILT_THRESHHOLD:
-            self._box_valid_push = False
-            self._failed_reason = FAIL_REASON_TILT
-            return
-        elif box_pose.p[2] > self._box_height_thresh:
-            self._box_valid_push = False
-            self._failed_reason = FAIL_REASON_LIFTED
-            return
-
-        # check contacts all at sides
         contacts = env.scene.get_contacts()
 
+        # get valid contacts
         def if_valid_contact(c):
             s = {c.actor1.name, c.actor2.name}
             return 'ground' not in s and BOX_NAME in s and c.separation < 1e-4
-        box_center = box_pose.p
-        valid_pos = np.array([c.point for c in contacts if if_valid_contact(c)])
+        valid_contacts = np.array([c for c in contacts if if_valid_contact(c)])
 
-        if len(valid_pos) > 0:
-            valid_pos_to_box_center = valid_pos - box_center
-            valid_pos_local_z = valid_pos_to_box_center @ box_up
-            if np.any(valid_pos_local_z > self._box.box_size):
-                self._box_valid_push = False
-                self._failed_reason = FAIL_REASON_TOUCHED_UP
-                return
+        # group
+        groups = {}
+        for c in valid_contacts:
+            other_actor = ({c.actor1.name, c.actor2.name} - {BOX_NAME}).pop()
+            pos = c.point
 
-        # check if succeeded
-        dist = np.linalg.norm(GOAl_POS[:2] - box_pose.p[:2])
-        if dist < BOX_AT_GOAL_THRESHOLD:
+            if other_actor not in groups:
+                groups[other_actor] = [pos]
+            else:
+                groups[other_actor].append(pos)
+
+        avg_contacts = {}
+        for name, poses in groups.items():
+            avg_contacts[name] = np.average(poses, axis=0)
+
+        if len(avg_contacts) > 1:
+            self._suceeded = False
+            self._failed_reason = FAIL_REASON_MULTI_CONTACT
+            return
+        elif len(avg_contacts) == 1:
+            contact_pos = list(avg_contacts.values())[0]
+            contact_actor = list(avg_contacts.keys())[0]
+            if self._last_contact is None:
+                self._last_contact = (contact_actor, contact_pos)
+                self._contact_start_step = env.current_step
+            else:
+                # check same contact actor and not moving a lot
+                if contact_actor != self._last_contact[0]:
+                    self._suceeded = False
+                    self._failed_reason = FAIL_REASON_MULTI_CONTACT
+                    return
+                elif np.linalg.norm(contact_pos - self._last_contact[1]) > 1e-3:
+                    self._suceeded = False
+                    self._failed_reason = FAIL_REASON_CONTACT_MOVED
+                    return
+
+        # check success and over-time failure
+        if self._contact_start_step is not None and len(avg_contacts) == 0:
             self._suceeded = True
+            return
+        elif self._contact_start_step is not None and env.current_step - self._contact_start_step > self._max_tap_steps:
+            self._suceeded = False
+            self._failed_reason = FAIL_REASON_TOUCHED_TOO_LONG
+            return
+
 
     @property
     def parameters(self) -> dict:
@@ -145,7 +151,7 @@ class DexPushTask(Task):
 
         status = {
             "succeeded": self._suceeded,
-            "valid_push": self._box_valid_push,
+            "touched": self._last_contact is not None,
             "tracking": self._tracking
         }
 
@@ -157,7 +163,7 @@ class DexPushTask(Task):
 
 if __name__ == '__main__':
     env = DexEnv()
-    task = DexPushTask()
+    task = DexTapTask()
     env.add_task(task)
 
     i = 0

@@ -7,7 +7,7 @@ from agent import Box, PandaArm
 from env.dexEnv import BOX_NAME, DexEnv, ARM_NAME
 from sapien_interfaces import Task, Env
 
-TASK_NAME = "Dexterous Box Push"
+TASK_NAME = "Dexterous Box Sliding"
 GOAl_POS = np.array([0.5, 0.3, -1])
 TILT_THRESHHOLD = np.pi / 180 * 20
 BOX_AT_GOAL_THRESHOLD = 5e-3
@@ -15,7 +15,7 @@ BOX_HEIGHT_THRESHOLD = 2e-2
 
 FAIL_REASON_TILT = "box was tilted"
 FAIL_REASON_LIFTED = "box was lifted off-ground"
-FAIL_REASON_TOUCHED_UP = "touched box at top"
+FAIL_REASON_TOUCHED_SIDES = "touched box at side"
 
 
 def build_goal(scene, side_len) -> sapien.Actor:
@@ -25,7 +25,7 @@ def build_goal(scene, side_len) -> sapien.Actor:
     return builder.build(True, "Goal")
 
 
-class DexPushTask(Task):
+class DexSlidingTask(Task):
 
     def __init__(self):
         self._box_valid_push = True
@@ -89,7 +89,7 @@ class DexPushTask(Task):
     def before_substep(self, env) -> None:
         pass
 
-    def after_substep(self, env) -> None:
+    def after_substep(self, env: Env) -> None:
         assert self._initialized, "task not initialized"
 
         if self._box_valid_push is False or self._suceeded is True or not self._tracking:
@@ -114,7 +114,7 @@ class DexPushTask(Task):
             self._failed_reason = FAIL_REASON_LIFTED
             return
 
-        # check contacts all at sides
+        # check contacts all at top
         contacts = env.scene.get_contacts()
 
         def if_valid_contact(c):
@@ -126,9 +126,9 @@ class DexPushTask(Task):
         if len(valid_pos) > 0:
             valid_pos_to_box_center = valid_pos - box_center
             valid_pos_local_z = valid_pos_to_box_center @ box_up
-            if np.any(valid_pos_local_z > self._box.box_size):
+            if np.any(valid_pos_local_z < self._box.box_size - 1e-4):
                 self._box_valid_push = False
-                self._failed_reason = FAIL_REASON_TOUCHED_UP
+                self._failed_reason = FAIL_REASON_TOUCHED_SIDES
                 return
 
         # check if succeeded
@@ -157,7 +157,7 @@ class DexPushTask(Task):
 
 if __name__ == '__main__':
     env = DexEnv()
-    task = DexPushTask()
+    task = DexSlidingTask()
     env.add_task(task)
 
     i = 0
