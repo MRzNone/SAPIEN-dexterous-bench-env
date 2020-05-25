@@ -13,7 +13,7 @@ FULL_TUMBLE_THRESHOLD = np.pi / 180 * 85
 BOX_EDGE_DISP_THRESHOLD = 3e-3
 
 FAIL_REASON_TOO_HIGH = "box was lifted too high off ground"
-FAIL_REASON_EDGE_MOVED = "flipping edge moved duting tumbling"
+FAIL_REASON_EDGE_MOVED = "flipping edge moved during tumbling"
 FAIL_REASON_DIAG_FLIP = "box was flipped not along the sides"
 
 
@@ -28,7 +28,8 @@ class DexTumbleTask(Task):
         self._goal: sapien.Actor = None
         self._box_height_thresh = None
         self._tracking = True
-        self._last_edge_center = None
+        self._last_edge_pt1 = None
+        self._last_edge_pt2 = None
         self._last_basis = None
         self._failed_reason = None
 
@@ -53,7 +54,8 @@ class DexTumbleTask(Task):
         self._box_valid_tumble = True
         self._suceeded = False
         self._tracking = True
-        self._last_edge_center = None
+        self._last_edge_pt1 = None
+        self._last_edge_pt2 = None
         self._box_height_thresh = self._box.observation['pose'].p[-1] + self._box.box_size * 1.5
         self._last_basis = None
         self._failed_reason = None
@@ -127,26 +129,41 @@ class DexTumbleTask(Task):
 
         # check edge center
         if tumble_x or tumble_y:
-            center2edge = np.array([0, 0, -self._box.box_size])
+            center2pt1 = np.array([0, 0, -self._box.box_size])
+            center2pt2 = center2pt1.copy()
 
             if tumble_x:
-                center2edge[0] = np.sign(theta_x) * self._box.box_size
+                center2pt1[0] = np.sign(theta_x) * self._box.box_size
+                center2pt1[1] = self._box.box_size/2
+
+                center2pt2[0] = np.sign(theta_x) * self._box.box_size
+                center2pt2[1] = -self._box.box_size/2
             else:
-                center2edge[1] = np.sign(theta_y) * self._box.box_size
+                center2pt1[1] = np.sign(theta_y) * self._box.box_size
+                center2pt1[0] = self._box.box_size/2
 
-            center2edge_pose = Pose(center2edge)
-            edge_pos = (box_pose * center2edge_pose).p
+                center2pt2[1] = np.sign(theta_y) * self._box.box_size
+                center2pt2[0] = -self._box.box_size/2
 
-            if self._last_edge_center is not None:
-                dist = np.linalg.norm(self._last_edge_center - edge_pos)
-                if dist > BOX_EDGE_DISP_THRESHOLD:
+            center2pt1_pose = Pose(center2pt1)
+            edge_pt1 = (box_pose * center2pt1_pose).p
+            center2pt2_pose = Pose(center2pt2)
+            edge_pt2 = (box_pose * center2pt2_pose).p
+
+            if self._last_edge_pt1 is not None and self._last_edge_pt2 is not None:
+                dist1 = np.linalg.norm(self._last_edge_pt1 - edge_pt1)
+                dist2 = np.linalg.norm(self._last_edge_pt2 - edge_pt2)
+
+                if dist1 > BOX_EDGE_DISP_THRESHOLD or dist2 > BOX_EDGE_DISP_THRESHOLD:
                     self._box_valid_tumble = False
                     self._failed_reason = FAIL_REASON_EDGE_MOVED
                     return
             else:
-                self._last_edge_center = edge_pos
+                self._last_edge_pt1 = edge_pt1
+                self._last_edge_pt2 = edge_pt2
         else:
-            self._last_edge_center = None
+            self._last_edge_pt1 = None
+            self._last_edge_pt2 = None
 
         # check succeeded
         if tumble_x ^ tumble_y and \
