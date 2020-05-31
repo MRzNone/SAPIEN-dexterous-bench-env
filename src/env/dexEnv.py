@@ -13,7 +13,7 @@ BOX_NAME = "DexBox"
 
 def random_pose_circle(theta_range=None, len=None):
     if len is None:
-        len = [0.4, 0.8]
+        len = [0.3, 0.6]
     if theta_range is None:
         theta_range = [0, 2 * np.pi]
 

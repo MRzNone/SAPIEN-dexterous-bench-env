@@ -26,7 +26,6 @@ class DexTapSolution(DexHackySolution):
         self.phase = Phase.rotate_toward_box
         self.init_control = True
         self.tg_pose = None
-        self.count = 0
 
         self.up_right_q = euler.euler2quat(np.pi, 0, 0)
 
@@ -35,7 +34,6 @@ class DexTapSolution(DexHackySolution):
         self.phase = Phase.rotate_toward_box
         self.init_control = True
         self.tg_pose = None
-        self.count = 0
 
         robot = env.agents[ARM_NAME]
         self.prep_drive(robot)
@@ -45,7 +43,6 @@ class DexTapSolution(DexHackySolution):
 
         self.init_control = True
         self.tg_pose = None
-        self.count = 0
 
     def before_step(self, env, task):
         robot: PandaArm = env.agents[ARM_NAME]
@@ -88,7 +85,6 @@ class DexTapSolution(DexHackySolution):
                 self.tg_pose.set_p(box.observation['pose'].p)
                 self.tg_pose = Pose([0, 0, 0.1 + box.box_size]) * self.tg_pose
                 self.init_control = False
-                self.count = round(0.5 / self.timestep / env.n_substeps)
 
             self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0.6], [0, 0]), max_v=5e-2)
 
