@@ -17,11 +17,14 @@ class PandaArm(Agent):
         self._damping = damping
         self.name = name
 
+        self.dof = None
+
         self._robot: sapien.Articulation = None
         self._initialized = False
 
         self._action_spec = None
         self._observation_spec = None
+        self._active_joints = None
 
     def init(self, env: Env):
         if self._initialized:
@@ -35,6 +38,8 @@ class PandaArm(Agent):
         self._robot = loader.load(arm_path)
         print()
 
+        self.dof = self._robot.dof
+
         # adjust damping
         for joint, d in zip(self._robot.get_joints(), np.array([self._damping] * self._robot.dof)):
             joint.set_drive_property(stiffness=0, damping=d)
@@ -42,6 +47,13 @@ class PandaArm(Agent):
         self._robot.set_pose(INI_POSE)
         self._robot.set_qpos(INI_QPOS)
         self._robot.set_name(self.name)
+
+        self._active_joints = [j for j in self._robot.get_joints() if j.get_dof() == 1]
+
+        qpos = np.array([0, 0, 0, -1.5, 0, 1.5, 0.7, 0.4, 0.4])
+        self._robot.set_qpos(qpos)
+        self._robot.set_qvel([0] * self._robot.dof)
+        self.set_action(qpos, [0] * self._robot.dof, self._robot.compute_passive_force())
 
         # set specs
         self._action_spec = {
@@ -52,6 +64,23 @@ class PandaArm(Agent):
 
         self._initialized = True
         print(f"CREATED: {self.name} created")
+        
+    def get_compute_functions(self):
+        """
+        provides various convenience functions
+        """
+        return {
+            'forward_dynamics': self._robot.compute_forward_dynamics,
+            'inverse_dynamics': self._robot.compute_inverse_dynamics,
+            'adjoint_matrix': self._robot.compute_adjoint_matrix,
+            'spatial_twist_jacobian': self._robot.compute_spatial_twist_jacobian,
+            'world_cartesian_jacobian': self._robot.compute_world_cartesian_jacobian,
+            'manipulator_inertia_matrix': self._robot.compute_manipulator_inertia_matrix,
+            'transformation_matrix': self._robot.compute_transformation_matrix,
+            'passive_force': self._robot.compute_passive_force,
+            'twist_diff_ik': self._robot.compute_twist_diff_ik,
+            'cartesian_diff_ik': self._robot.compute_cartesian_diff_ik
+        }
 
     def reset(self, env: Env) -> None:
         self._robot.set_pose(INI_POSE)
@@ -70,22 +99,35 @@ class PandaArm(Agent):
         """
         Return qpos, qvel and link poses
         """
-
-        poses = map(lambda link: link.get_pose() , self._robot.get_links())
-
         return {
             "qpos": self._robot.get_qpos(),
             "qvel": self._robot.get_qvel(),
-            "link_poses": poses
+            "poses": [link.get_pose() for link in self._robot.get_links()]
         }
 
-    def set_action(self, action):
+    def configure_controllers(self, ps, ds):
         """
-        Set the joint torque
+        Set parameters for the PD controllers for the robot joints
+        """
+        assert len(ps) == self.dof
+        assert len(ds) == self.dof
+        for j, p, d in zip(self._active_joints, ps, ds):
+            j.set_drive_property(p, d)
 
-        :param action: the joint torque
+    def set_action(self, drive_target, drive_velocity, additional_force):
         """
-        self._robot.set_qf(action)
+        action includes 3 parts
+        drive_target: qpos target for PD controller
+        drive_velocity: qvel target for PD controller
+        additional_force: additional qf applied to the joints
+        """
+        assert len(drive_target) == self.dof
+        assert len(drive_velocity) == self.dof
+        assert len(additional_force) == self.dof
+        for j, t, v in zip(self._active_joints, drive_target, drive_velocity):
+            j.set_drive_target(t)
+            j.set_drive_velocity_target(v)
+        self._robot.set_qf(additional_force)
 
     def step(self, env, step: int):
         pass

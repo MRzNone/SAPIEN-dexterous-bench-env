@@ -5,7 +5,7 @@ from transforms3d.quaternions import quat2mat
 
 from agent import Box, PandaArm
 from env.dexEnv import BOX_NAME, DexEnv, ARM_NAME
-from sapien_interfaces import Task, Env
+from sapien_interfaces import Task, Env, Solution
 
 TASK_NAME = "Dexterous Box Push"
 GOAl_POS = np.array([0.5, 0.3, -1])
@@ -40,6 +40,7 @@ class DexPushTask(Task):
 
         self._initialized = False
         self._parameters = None
+        self.solution = None
 
     def init(self, env: Env) -> None:
         if self._initialized:
@@ -81,10 +82,12 @@ class DexPushTask(Task):
         self._arm.reset(env)
 
     def before_step(self, env) -> None:
-        pass
+        if self.solution is not None:
+            self.solution.before_step(env, self)
 
     def after_step(self, env) -> None:
-        pass
+        if self.solution is not None:
+            self.solution.after_step(env, self)
 
     def before_substep(self, env) -> None:
         pass
@@ -153,6 +156,9 @@ class DexPushTask(Task):
             status['failed_reason'] = self._failed_reason
 
         return status
+
+    def register_slotion(self, sol: Solution):
+        self.solution = sol
 
 
 if __name__ == '__main__':

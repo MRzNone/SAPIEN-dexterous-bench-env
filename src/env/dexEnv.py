@@ -13,7 +13,7 @@ BOX_NAME = "DexBox"
 
 def random_pose_circle(theta_range=None, len=None):
     if len is None:
-        len = [0.2, 0.6]
+        len = [0.4, 0.8]
     if theta_range is None:
         theta_range = [0, 2 * np.pi]
 
@@ -27,7 +27,7 @@ def random_pose_circle(theta_range=None, len=None):
 
 
 class DexEnv(Env):
-    def __init__(self, timestep: float = 1 / 60, frame_skip: int = 5, visual: bool = True, cam_pos=None, cam_rot=None):
+    def __init__(self, timestep: float = 1 / 60, frame_skip: int = 1, visual: bool = True, cam_pos=None, cam_rot=None):
         if cam_rot is None:
             cam_rot = [-np.pi, -np.pi/9]
         if cam_pos is None:
@@ -64,6 +64,10 @@ class DexEnv(Env):
 
         # set up basic environment
         self._set_up_basic_env()
+
+        for _ in range(100):
+            self._scene.step()
+        self._render_controller.render()
 
     def _set_up_basic_env(self):
         # arm

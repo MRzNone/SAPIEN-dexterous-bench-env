@@ -1,3 +1,6 @@
+from sapien_interfaces.solution import Solution
+
+
 class Task:
     def init(self, env) -> None:
         """called to initialize the task with environment.
@@ -49,3 +52,6 @@ class Task:
     def description(self) -> str:
         """Human readable description for the task."""
         return ''
+
+    def register_slotion(self, sol: Solution):
+        raise NotImplementedError()
