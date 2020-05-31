@@ -80,15 +80,15 @@ class DexPushSolution(DexHackySolution):
                 robot2box = box2wd.inv() * robot.observation['poses'][0]
 
                 direct = np.array([0, 0, 0])
-                if np.linalg.norm(goal2box.p) > 1.5e-1:
+                if np.min(np.abs(goal2box.p)) > 5e-3:
                     indx = np.argmin(np.abs(robot2box.p[:2]))
                     if np.abs(goal2box.p[indx]) < 8e-4:
                         indx = 1 - indx
                 else:
-                    indx = np.argmax(np.abs(goal2box.p))
+                    indx = np.argmax(np.abs(goal2box.p[:2]))
                 direct[indx] = 1
                 dist = goal2box.p @ direct
-                dist = np.min((dist, 0.3))
+                dist = np.min((dist, 0.2))
 
                 quat = Pose([0]*3, self.up_right_q)
                 if direct[1] == 1:
@@ -99,11 +99,11 @@ class DexPushSolution(DexHackySolution):
 
                 self.plan2wd = box2wd * Pose(-direct * np.sign(dist) * (box.box_size + gripper_width) + dist * direct) * ee2pt
                 self.push2wd = box2wd * Pose(-direct * np.sign(dist) * (box.box_size + gripper_width)) * ee2pt
-                self.tg_pose = Pose([0,0,0.1]) * self.push2wd
+                self.tg_pose = Pose([0,0,0.1]) * box2wd * Pose(-direct * np.sign(dist) * (box.box_size + gripper_width + 0.02)) * ee2pt
 
                 self.init_control = False
 
-            self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0], [0, 0]), dist_abs_thresh=1e-5, dist_thresh=1e-4, theta_abs_thresh=1e-3, theta_thresh=1e-3)
+            self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0], [0, 0]), dist_abs_thresh=1e-6, dist_thresh=1e-6, theta_abs_thresh=1e-3, theta_thresh=1e-3)
 
             if self.drive[robot] is False:
                 self.phase = Phase.move2box
@@ -112,7 +112,7 @@ class DexPushSolution(DexHackySolution):
             if self.init_control is True:
                 self.tg_pose = self.push2wd
 
-            self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0], [0, 0]), dist_abs_thresh=1e-5, dist_thresh=1e-4, theta_abs_thresh=1e-3, theta_thresh=1e-3)
+            self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0], [0, 0]), dist_abs_thresh=1e-5, dist_thresh=1e-5, theta_abs_thresh=1e-3, theta_thresh=1e-3)
 
             if self.drive[robot] is False:
                 self.prep_drive(robot)
@@ -147,6 +147,7 @@ class DexPushSolution(DexHackySolution):
 
 
 if __name__ == '__main__':
+    np.random.seed(26546)
     env = DexEnv()
     task = DexPushTask()
     env.add_task(task)
