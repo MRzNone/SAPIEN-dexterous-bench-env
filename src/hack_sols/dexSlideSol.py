@@ -8,6 +8,7 @@ from env.dexEnv import DexEnv, ARM_NAME, BOX_NAME
 from hack_sols import DexHackySolution
 from sapien_interfaces import Task
 from task.dexPushTask import DexPushTask
+from task.dexSlidingTask import DexSlidingTask
 
 
 class Phase(enum.Enum):
@@ -20,7 +21,7 @@ class Phase(enum.Enum):
     done = 5
 
 
-class DexPushSolution(DexHackySolution):
+class DexSlideSolution(DexHackySolution):
     def __init__(self):
         super().__init__()
         self.phase = Phase.rotate_toward_box
@@ -50,7 +51,7 @@ class DexPushSolution(DexHackySolution):
         self.init_control = True
         self.tg_pose = None
 
-    def before_step(self, env, task: DexPushTask):
+    def before_step(self, env, task: DexSlidingTask):
         robot: PandaArm = env.agents[ARM_NAME]
         box: Box = env.agents[BOX_NAME]
 
@@ -88,18 +89,16 @@ class DexPushSolution(DexHackySolution):
                     indx = np.argmax(np.abs(goal2box.p[:2]))
                 direct[indx] = 1
                 dist = goal2box.p @ direct
-                dist = np.min((abs(dist), 0.2)) * np.sign(dist)
+                dist = np.clip(abs(dist), 0.05, 0.2) * np.sign(dist)
 
                 quat = Pose([0]*3, self.up_right_q)
                 if direct[1] == 1:
                     quat = quat * Pose([0]*3, euler.euler2quat(0, 0, np.pi/2))
-                ee2pt = Pose([0,0,0.1], quat.q)
+                ee2pt = Pose([0,0,0.07], quat.q)
 
-                gripper_width = 0.013
-
-                self.plan2wd = box2wd * Pose(-direct * np.sign(dist) * (box.box_size + gripper_width) + dist * direct) * ee2pt
-                self.push2wd = box2wd * Pose(-direct * np.sign(dist) * (box.box_size + gripper_width)) * ee2pt
-                self.tg_pose = Pose([0,0,0.1]) * box2wd * Pose(-direct * np.sign(dist) * (box.box_size + gripper_width + 0.02)) * ee2pt
+                self.plan2wd = box2wd * Pose(dist * direct) * ee2pt
+                self.push2wd = box2wd * ee2pt
+                self.tg_pose = Pose([0,0,0.07]) * box2wd * ee2pt
 
                 self.init_control = False
 
@@ -121,9 +120,11 @@ class DexPushSolution(DexHackySolution):
             if self.init_control is True:
                 self.tg_pose = self.plan2wd
 
-            self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0], [0, 0]), dist_abs_thresh=1e-5, dist_thresh=1e-5, theta_abs_thresh=1e-3, theta_thresh=1e-3)
+            self.drive_to_pose(robot, self.tg_pose, override=([-1, -2], [0, 0], [0, 0]), max_v=0.05, dist_abs_thresh=1e-5, dist_thresh=1e-5, theta_abs_thresh=1e-3, theta_thresh=1e-3)
 
-            if self.drive[robot] is False or task.get_trajectory_status()['succeeded'] is True:
+            if self.drive[robot] is False or\
+                    task.get_trajectory_status()['tilt_theta'] > task.parameters['box_tilt_threshold_rad'] * 0.9 or\
+                    task.get_trajectory_status()['succeeded'] is True:
                 self.prep_drive(robot)
                 self.phase = Phase.moveUp
         elif self.phase is Phase.moveUp:
@@ -137,7 +138,7 @@ class DexPushSolution(DexHackySolution):
                 self.prep_drive(robot)
                 status = task.get_trajectory_status()
 
-                if status['succeeded'] is False and status['valid_push'] is True:
+                if status['succeeded'] is False and status['valid_slide'] is True:
                     self.phase = Phase.move2above
                 else:
                     self.phase = Phase.evaluate
@@ -149,9 +150,9 @@ class DexPushSolution(DexHackySolution):
 if __name__ == '__main__':
     np.random.seed(26546)
     env = DexEnv()
-    task = DexPushTask()
+    task = DexSlidingTask()
     env.add_task(task)
-    sol = DexPushSolution()
+    sol = DexSlideSolution()
     task.register_slotion(sol)
     sol.init(env, task)
 

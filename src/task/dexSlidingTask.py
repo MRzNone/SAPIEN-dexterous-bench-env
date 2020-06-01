@@ -41,6 +41,7 @@ class DexSlidingTask(Task):
         self._initialized = False
         self._parameters = None
         self.solution = None
+        self.tilt_theta = None
 
     def init(self, env: Env) -> None:
         if self._initialized:
@@ -54,7 +55,10 @@ class DexSlidingTask(Task):
         self._box_height_thresh = self._box.observation['pose'].p[2] + BOX_HEIGHT_THRESHOLD
 
         # add arm
-        self._arm = env.agents[ARM_NAME]
+        env.agents[ARM_NAME].close(env)
+        self._arm = env.agents[ARM_NAME] = PandaArm(env, ARM_NAME, pusher=True)
+        self._arm.init(env)
+        env.agents[ARM_NAME] = self._arm
         assert self._arm is not None and isinstance(self._arm, PandaArm), \
             f"{ARM_NAME} does not exist in env"
 
@@ -65,6 +69,7 @@ class DexSlidingTask(Task):
         self._suceeded = False
         self._tracking = True
         self._failed_reason = None
+        self.tilt_theta = None
 
         self._parameters = {
             "box_size": self._box.box_size,
@@ -107,6 +112,7 @@ class DexSlidingTask(Task):
         box_up /= np.linalg.norm(box_up)
 
         theta = np.arccos(box_up @ up_right_pose)
+        self.tilt_theta = theta
 
         if theta > TILT_THRESHHOLD:
             self._box_valid_push = False
@@ -129,7 +135,8 @@ class DexSlidingTask(Task):
         if len(valid_pos) > 0:
             valid_pos_to_box_center = valid_pos - box_center
             valid_pos_local_z = valid_pos_to_box_center @ box_up
-            if np.any(valid_pos_local_z < self._box.box_size - 1e-4):
+            valid_pos_center_dist = np.linalg.norm(valid_pos_to_box_center[:, :2], axis=1)
+            if np.any(np.logical_and(valid_pos_local_z < self._box.box_size - 1e-4, valid_pos_center_dist < self._box.box_size * 0.8)):
                 self._box_valid_push = False
                 self._failed_reason = FAIL_REASON_TOUCHED_SIDES
                 return
@@ -148,8 +155,9 @@ class DexSlidingTask(Task):
 
         status = {
             "succeeded": self._suceeded,
-            "valid_push": self._box_valid_push,
-            "tracking": self._tracking
+            "valid_slide": self._box_valid_push,
+            "tracking": self._tracking,
+            "tilt_theta": self.tilt_theta,
         }
 
         if not self._suceeded and not self._tracking:

@@ -11,7 +11,7 @@ INI_QPOS = np.array([0, 0, 0, -1.5, 0, 1.5, 0.7, 0.4, 0.4])
 
 
 class PandaArm(Agent):
-    def __init__(self, env: Env, name: str, damping: int = 50):
+    def __init__(self, env: Env, name: str, damping: int = 50, pusher=False):
         super().__init__()
 
         self._damping = damping
@@ -25,6 +25,7 @@ class PandaArm(Agent):
         self._action_spec = None
         self._observation_spec = None
         self._active_joints = None
+        self._pusher = pusher
 
     def init(self, env: Env):
         if self._initialized:
@@ -35,8 +36,28 @@ class PandaArm(Agent):
         loader = env.scene.create_urdf_loader()
         loader.fix_root_link = True
         arm_path = os.path.join(config.ASSET_DIR, "Arm/panda.urdf")
-        self._robot = loader.load(arm_path)
         print()
+        if not self._pusher:
+            self._robot = loader.load(arm_path)
+        else:
+            builder = loader.load_file_as_articulation_builder(arm_path)
+            lb = builder.get_link_builders()
+            lb[-1].remove_all_shapes()
+            lb[-1].remove_all_visuals()
+            lb[-2].remove_all_shapes()
+            lb[-2].remove_all_visuals()
+            lb[-3].remove_all_shapes()
+            lb[-3].remove_all_visuals()
+
+            pusher_size = [0.06, 0.06, 0.03]
+            pusher_pose = Pose([0,0,0.03])
+
+            material = env._sim.create_physical_material(0.9, 0.9, 0)
+
+            lb[-3].add_box_shape(pusher_pose, pusher_size, material=material)
+            lb[-3].add_box_visual_complex(pusher_pose, pusher_size)
+
+            self._robot = builder.build(True)
 
         self.dof = self._robot.dof
 
@@ -131,3 +152,6 @@ class PandaArm(Agent):
 
     def step(self, env, step: int):
         pass
+
+    def close(self, env) -> None:
+        env.scene.remove_articulation(self._robot)

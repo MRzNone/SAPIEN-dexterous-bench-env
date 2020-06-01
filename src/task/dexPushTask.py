@@ -129,10 +129,11 @@ class DexPushTask(Task):
         if len(valid_pos) > 0:
             valid_pos_to_box_center = valid_pos - box_center
             valid_pos_local_z = valid_pos_to_box_center @ box_up
-            # if np.any(valid_pos_local_z > self._box.box_size * 1.05):
-            #     self._box_valid_push = False
-            #     self._failed_reason = FAIL_REASON_TOUCHED_UP
-            #     return
+            valid_pos_center_dist = np.linalg.norm(valid_pos_to_box_center[:, :2], axis=1)
+            if np.any(np.logical_and(valid_pos_local_z > self._box.box_size * 1.05, valid_pos_center_dist < self._box.box_size * 0.8)):
+                self._box_valid_push = False
+                self._failed_reason = FAIL_REASON_TOUCHED_UP
+                return
 
         # check if succeeded
         dist = np.linalg.norm(GOAl_POS[:2] - box_pose.p[:2])

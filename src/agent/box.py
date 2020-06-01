@@ -19,8 +19,10 @@ class Box(Agent):
             print(f"{self.name} already initialized")
             return
 
+        material = env._sim.create_physical_material(0.1, 0.1, 0)
+
         builder = env.scene.create_actor_builder()
-        builder.add_box_shape(size=self._size)
+        builder.add_box_shape(size=self._size, material=material)
         builder.add_box_visual(size=self._size, color=np.array([0.2, 0.4, 0.6]))
         self._box = builder.build()
         self._box.set_name(self.name)
