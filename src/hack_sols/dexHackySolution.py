@@ -2,12 +2,11 @@ from collections import defaultdict
 
 from sapien.core import Pose
 import numpy as np
-from transforms3d import quaternions as quat, euler
+from transforms3d import quaternions as quat
 
 from agent import PandaArm
 from env.dexEnv import DexEnv, ARM_NAME
 from sapien_interfaces import Task, Solution
-from task.dexTapTask import DexTapTask
 
 
 def comp_pose(pose1: Pose, pose2: Pose):

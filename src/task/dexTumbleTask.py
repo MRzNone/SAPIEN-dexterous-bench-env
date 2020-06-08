@@ -7,7 +7,7 @@ from agent import Box, PandaArm
 from env.dexEnv import BOX_NAME, DexEnv, ARM_NAME
 from sapien_interfaces import Task, Env, Solution
 
-TASK_NAME = "Dexterous Box Push"
+TASK_NAME = "Dexterous Box Tumble"
 TILT_THRESHOLD = np.pi / 180 * 10
 FULL_TUMBLE_THRESHOLD = np.pi / 180 * 85
 BOX_EDGE_DISP_THRESHOLD = 3e-3

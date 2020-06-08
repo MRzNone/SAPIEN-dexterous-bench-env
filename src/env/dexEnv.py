@@ -44,7 +44,7 @@ class DexEnv(Env):
             self._render_controller.set_camera_rotation(*cam_rot)
 
         sceneConfig = sapien.SceneConfig()
-        sceneConfig.sleep_threshold = 0.00005
+        sceneConfig.sleep_threshold = 0.00002
         self._scene = self._sim.create_scene(config=sceneConfig)
         self._scene.add_ground(-1)
         self._scene.set_timestep(timestep)

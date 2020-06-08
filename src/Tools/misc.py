@@ -31,7 +31,7 @@ ant_poses = {
 }
 
 
-def create_ant_builder(scene: sapien.Scene, sim: sapien.Engine, rgba=None) -> sapien.pysapien.ArticulationBuilder:
+def create_ant_builder(scene: sapien.Scene, sim: sapien.Engine, rgba=None) -> sapien.ArticulationBuilder:
     if rgba is None:
         rgba = [0.875, 0.553, 0.221, 1]
     copper = sapien.PxrMaterial()
